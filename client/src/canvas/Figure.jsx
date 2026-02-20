@@ -29,8 +29,8 @@ const Figure = () => {
     vertexBottomColor: "#55ff55"
   }
 
-  // Разделяем ребра на три категории
-  const { frontBottomEdges, rearBottomEdges, otherEdges } = useMemo(() => {
+  // Разделяем ребра на категории с информацией о позиции
+  const { bottomEdges, otherEdges, bottomEdgesData } = useMemo(() => {
     const geometry = new THREE.ConeGeometry(
       pyramidParams.radius,
       pyramidParams.height,
@@ -39,12 +39,9 @@ const Figure = () => {
     const edges = new THREE.EdgesGeometry(geometry, 15)
     const positions = edges.attributes.position.array
     
-    const frontBottom = []
-    const rearBottom = []
+    const bottom = []
     const other = []
-    
-    // Определяем направление "вперед" (например, по Z)
-    const frontDir = new THREE.Vector3(0, 0, 1)
+    const bottomData = []
     
     for (let i = 0; i < positions.length; i += 6) {
       const p1 = new THREE.Vector3(positions[i], positions[i+1], positions[i+2])
@@ -62,26 +59,20 @@ const Figure = () => {
         Math.abs(p2.y + pyramidParams.height/2) < 0.01;
       
       if (isBottom) {
-        // Определяем, переднее или заднее нижнее ребро
-        if (center.z > 0) {
-          frontBottom.push(...verts)
-        } else {
-          rearBottom.push(...verts)
-        }
+        bottom.push(...verts)
+        bottomData.push({
+          center: center.clone(),
+          vertices: verts
+        })
       } else {
         other.push(...verts)
       }
     }
     
     // Создаем геометрии
-    const frontBottomGeo = new THREE.BufferGeometry()
-    if (frontBottom.length > 0) {
-      frontBottomGeo.setAttribute('position', new THREE.Float32BufferAttribute(frontBottom, 3))
-    }
-    
-    const rearBottomGeo = new THREE.BufferGeometry()
-    if (rearBottom.length > 0) {
-      rearBottomGeo.setAttribute('position', new THREE.Float32BufferAttribute(rearBottom, 3))
+    const bottomGeo = new THREE.BufferGeometry()
+    if (bottom.length > 0) {
+      bottomGeo.setAttribute('position', new THREE.Float32BufferAttribute(bottom, 3))
     }
     
     const otherGeo = new THREE.BufferGeometry()
@@ -90,13 +81,26 @@ const Figure = () => {
     }
     
     return { 
-      frontBottomEdges: frontBottomGeo, 
-      rearBottomEdges: rearBottomGeo, 
+      bottomEdges: bottomGeo,
+      bottomEdgesData: bottomData,
       otherEdges: otherGeo 
     }
   }, [])
 
-  // Состояния для остальных ребер (которые меняются)
+  // Состояния для нижних ребер (передние/задние)
+  const [visibleBottomEdges, setVisibleBottomEdges] = useState(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
+    return geo
+  })
+  
+  const [hiddenBottomEdges, setHiddenBottomEdges] = useState(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
+    return geo
+  })
+
+  // Состояния для остальных ребер
   const [visibleOtherEdges, setVisibleOtherEdges] = useState(() => {
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
@@ -151,8 +155,8 @@ const Figure = () => {
     return material
   }, [])
 
-  // Функция для определения видимости остальных ребер
-  const isOtherEdgeVisible = (edge, cameraPos, groupMatrix) => {
+  // Функция для определения видимости ребра
+  const isEdgeVisible = (edge, cameraPos, groupMatrix) => {
     const worldCenter = edge.center.clone().applyMatrix4(groupMatrix)
     const dirFromCenter = worldCenter.clone().normalize()
     const dirToCamera = cameraPos.clone().sub(worldCenter).normalize()
@@ -161,42 +165,82 @@ const Figure = () => {
     return dot > -0.7
   }
 
-  // Обновляем только остальные ребра
-  const updateOtherEdges = (cameraPos) => {
-    if (!groupRef.current || !otherEdgeData.length) return
+  // Функция для определения, является ли нижнее ребро передним относительно камеры
+  const isBottomEdgeFront = (edge, cameraPos, groupMatrix) => {
+    const worldCenter = edge.center.clone().applyMatrix4(groupMatrix)
+    const dirFromCenter = worldCenter.clone().normalize()
+    const dirToCamera = cameraPos.clone().sub(worldCenter).normalize()
+    const dot = dirFromCenter.dot(dirToCamera)
+    
+    return dot > -0
+  }
+
+  // Обновляем все ребра
+  const updateEdges = (cameraPos) => {
+    if (!groupRef.current) return
 
     const groupMatrix = groupRef.current.matrixWorld
     
-    const visibleVerts = []
-    const hiddenVerts = []
+    // Обновляем нижние ребра
+    const visibleBottomVerts = []
+    const hiddenBottomVerts = []
     
-    otherEdgeData.forEach(edge => {
-      const visible = isOtherEdgeVisible(edge, cameraPos, groupMatrix)
+    bottomEdgesData.forEach(edge => {
+      const isFront = isBottomEdgeFront(edge, cameraPos, groupMatrix)
       
-      if (visible) {
-        visibleVerts.push(...edge.vertices)
+      if (isFront) {
+        visibleBottomVerts.push(...edge.vertices)
       } else {
-        hiddenVerts.push(...edge.vertices)
+        hiddenBottomVerts.push(...edge.vertices)
       }
     })
     
-    const newVisibleGeo = new THREE.BufferGeometry()
-    if (visibleVerts.length > 0) {
-      newVisibleGeo.setAttribute('position', new THREE.Float32BufferAttribute(visibleVerts, 3))
+    const newVisibleBottomGeo = new THREE.BufferGeometry()
+    if (visibleBottomVerts.length > 0) {
+      newVisibleBottomGeo.setAttribute('position', new THREE.Float32BufferAttribute(visibleBottomVerts, 3))
     }
     
-    const newHiddenGeo = new THREE.BufferGeometry()
-    if (hiddenVerts.length > 0) {
-      newHiddenGeo.setAttribute('position', new THREE.Float32BufferAttribute(hiddenVerts, 3))
+    const newHiddenBottomGeo = new THREE.BufferGeometry()
+    if (hiddenBottomVerts.length > 0) {
+      newHiddenBottomGeo.setAttribute('position', new THREE.Float32BufferAttribute(hiddenBottomVerts, 3))
     }
     
-    setVisibleOtherEdges(newVisibleGeo)
-    setHiddenOtherEdges(newHiddenGeo)
+    setVisibleBottomEdges(newVisibleBottomGeo)
+    setHiddenBottomEdges(newHiddenBottomGeo)
+    
+    // Обновляем остальные ребра
+    if (otherEdgeData.length) {
+      const visibleOtherVerts = []
+      const hiddenOtherVerts = []
+      
+      otherEdgeData.forEach(edge => {
+        const visible = isEdgeVisible(edge, cameraPos, groupMatrix)
+        
+        if (visible) {
+          visibleOtherVerts.push(...edge.vertices)
+        } else {
+          hiddenOtherVerts.push(...edge.vertices)
+        }
+      })
+      
+      const newVisibleOtherGeo = new THREE.BufferGeometry()
+      if (visibleOtherVerts.length > 0) {
+        newVisibleOtherGeo.setAttribute('position', new THREE.Float32BufferAttribute(visibleOtherVerts, 3))
+      }
+      
+      const newHiddenOtherGeo = new THREE.BufferGeometry()
+      if (hiddenOtherVerts.length > 0) {
+        newHiddenOtherGeo.setAttribute('position', new THREE.Float32BufferAttribute(hiddenOtherVerts, 3))
+      }
+      
+      setVisibleOtherEdges(newVisibleOtherGeo)
+      setHiddenOtherEdges(newHiddenOtherGeo)
+    }
   }
 
   useFrame(({ camera }) => {
     if (groupRef.current) {
-      updateOtherEdges(camera.position)
+      updateEdges(camera.position)
     }
   })
 
@@ -226,19 +270,18 @@ const Figure = () => {
           />
         </mesh>
         
-        {/* ПЕРЕДНИЕ НИЖНИЕ РЕБРА - сплошные */}
-        {frontBottomEdges.attributes?.position?.count > 0 && (
+        {/* НИЖНИЕ РЕБРА - меняются в зависимости от поворота */}
+        {visibleBottomEdges.attributes?.position?.count > 0 && (
           <lineSegments
-            geometry={frontBottomEdges}
+            geometry={visibleBottomEdges}
             material={solidMaterial}
             renderOrder={2}
           />
         )}
         
-        {/* ЗАДНИЕ НИЖНИЕ РЕБРА - ВСЕГДА ПУНКТИРНЫЕ */}
-        {rearBottomEdges.attributes?.position?.count > 0 && (
+        {hiddenBottomEdges.attributes?.position?.count > 0 && (
           <lineSegments
-            geometry={rearBottomEdges}
+            geometry={hiddenBottomEdges}
             material={dashMaterial}
             renderOrder={1}
             onUpdate={self => self.computeLineDistances()}
