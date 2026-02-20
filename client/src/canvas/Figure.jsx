@@ -29,8 +29,8 @@ const Figure = () => {
     vertexBottomColor: "#55ff55"
   }
 
-  // Получаем все ребра
-  const { edgeData } = useMemo(() => {
+  // Получаем все ребра с дополнительной информацией
+  const { edgeData, bottomEdges } = useMemo(() => {
     const geometry = new THREE.ConeGeometry(
       pyramidParams.radius,
       pyramidParams.height,
@@ -41,14 +41,26 @@ const Figure = () => {
     
     // Собираем данные о каждом ребре
     const data = []
+    const bottomEdgesIndices = []
+    
     for (let i = 0; i < positions.length; i += 6) {
       const p1 = new THREE.Vector3(positions[i], positions[i+1], positions[i+2])
       const p2 = new THREE.Vector3(positions[i+3], positions[i+4], positions[i+5])
       const center = p1.clone().add(p2).multiplyScalar(0.5)
       
+      // Определяем, является ли ребро нижним (оба конца внизу)
+      const isBottom = 
+        Math.abs(p1.y + pyramidParams.height/2) < 0.01 && 
+        Math.abs(p2.y + pyramidParams.height/2) < 0.01;
+      
+      if (isBottom) {
+        bottomEdgesIndices.push(data.length);
+      }
+      
       data.push({
         p1, p2,
         center,
+        isBottom,
         vertices: [
           positions[i], positions[i+1], positions[i+2],
           positions[i+3], positions[i+4], positions[i+5]
@@ -56,7 +68,7 @@ const Figure = () => {
       })
     }
     
-    return { edgeData: data }
+    return { edgeData: data, bottomEdges: bottomEdgesIndices }
   }, [])
 
   // Состояния для геометрии
@@ -91,7 +103,7 @@ const Figure = () => {
   }, [])
 
   // Функция для определения видимости ребра
-  const isEdgeVisible = (edge, cameraPos, groupMatrix) => {
+  const isEdgeVisible = (edge, cameraPos, groupMatrix, cameraHeight) => {
     // Получаем центр ребра в мировых координатах
     const worldCenter = edge.center.clone().applyMatrix4(groupMatrix)
     
@@ -101,21 +113,36 @@ const Figure = () => {
     // Направление от ребра к камере
     const dirToCamera = cameraPos.clone().sub(worldCenter).normalize()
     
-    // Скалярное произведение - насколько ребро "смотрит" на камеру
-    // Значение от -1 до 1
+    // Скалярное произведение
     const dot = dirFromCenter.dot(dirToCamera)
     
-    // БОЛЕЕ ЧУВСТВИТЕЛЬНАЯ ЛОГИКА:
-    // Если dot > -0.7, значит ребро видно (даже если чуть-чуть)
-    // Раньше было 0.2, теперь -0.7
+    // Базовое условие видимости
+    const isBasicallyVisible = dot > -0.7
     
-    // Это значит:
-    // dot = 1.0  - ребло идеально смотрит на камеру
-    // dot = 0.0  - ребро сбоку (90 градусов)
-    // dot = -0.7 - ребро почти полностью отвернулось (135 градусов)
-    // dot = -1.0 - ребро смотрит строго от камеры
+    // Если это нижнее ребро, применяем специальную логику
+    if (edge.isBottom) {
+      // Порог высоты камеры (относительно нижней точки пирамиды)
+      // Чем меньше значение, тем ниже должна быть камера
+      const LOW_CAMERA_THRESHOLD = -0.5; // Подберите это значение под вашу сцену
+      
+      // Получаем высоту камеры в локальных координатах пирамиды
+      const localCameraPos = cameraPos.clone().applyMatrix4(groupMatrix.clone().invert());
+      const cameraY = localCameraPos.y;
+      
+      // Камера считается "в самом низу", если она ниже определенного порога
+      const isCameraVeryLow = cameraY < LOW_CAMERA_THRESHOLD;
+      
+      // Если камера низко, то дальние нижние ребра становятся сплошными
+      if (isCameraVeryLow) {
+        // Для нижних ребер используем другую логику видимости
+        // Теперь они видны, если dot > -0.2 (более строгое условие)
+        // или если они находятся с противоположной стороны
+        return dot > -0.2;
+      }
+    }
     
-    return dot > -0.7
+    // Для всех остальных случаев используем стандартную логику
+    return isBasicallyVisible
   }
 
   // Обновляем видимость ребер
@@ -124,11 +151,15 @@ const Figure = () => {
 
     const groupMatrix = groupRef.current.matrixWorld
     
+    // Получаем высоту камеры в локальных координатах
+    const localCameraPos = cameraPos.clone().applyMatrix4(groupMatrix.clone().invert());
+    const cameraY = localCameraPos.y;
+    
     const visibleVerts = []
     const hiddenVerts = []
     
     edgeData.forEach(edge => {
-      const visible = isEdgeVisible(edge, cameraPos, groupMatrix)
+      const visible = isEdgeVisible(edge, cameraPos, groupMatrix, cameraY)
       
       if (visible) {
         visibleVerts.push(...edge.vertices)
