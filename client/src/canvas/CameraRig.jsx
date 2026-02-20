@@ -9,19 +9,20 @@ const CameraRig = ({children}) => {
   const snap = useSnapshot(state);
   
   useFrame((state, delta) => {
-    // Сохраняем текущий поворот в глобальном состоянии
-    if (group.current) {
-      const rotation = group.current.rotation
-      state.cameraRigRotation = {
-        x: rotation.x,
-        y: rotation.y,
-        z: rotation.z
-      }
+    if (!group.current) return;
+    
+    // Сохраняем текущий поворот
+    const rotation = group.current.rotation
+    state.cameraRigRotation = {
+      x: rotation.x,
+      y: rotation.y,
+      z: rotation.z
     }
     
+    // МЕНЯЕМ ТОЛЬКО Y (горизонтальный поворот), X ЗАКРЕПЛЕН НА 0
     easing.dampE(
       group.current.rotation,
-      [state.pointer.y / 3.5, -state.pointer.x/1.5, 0],
+      [0, -state.pointer.x/1.27, 0], // X всегда 0, меняется только Y
       0.25,
       delta
     )

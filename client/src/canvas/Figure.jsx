@@ -29,8 +29,8 @@ const Figure = () => {
     vertexBottomColor: "#55ff55"
   }
 
-  // Получаем все ребра с дополнительной информацией
-  const { edgeData, bottomEdges } = useMemo(() => {
+  // Разделяем ребра на три категории
+  const { frontBottomEdges, rearBottomEdges, otherEdges } = useMemo(() => {
     const geometry = new THREE.ConeGeometry(
       pyramidParams.radius,
       pyramidParams.height,
@@ -39,28 +39,90 @@ const Figure = () => {
     const edges = new THREE.EdgesGeometry(geometry, 15)
     const positions = edges.attributes.position.array
     
-    // Собираем данные о каждом ребре
-    const data = []
-    const bottomEdgesIndices = []
+    const frontBottom = []
+    const rearBottom = []
+    const other = []
+    
+    // Определяем направление "вперед" (например, по Z)
+    const frontDir = new THREE.Vector3(0, 0, 1)
     
     for (let i = 0; i < positions.length; i += 6) {
       const p1 = new THREE.Vector3(positions[i], positions[i+1], positions[i+2])
       const p2 = new THREE.Vector3(positions[i+3], positions[i+4], positions[i+5])
       const center = p1.clone().add(p2).multiplyScalar(0.5)
       
-      // Определяем, является ли ребро нижним (оба конца внизу)
+      const verts = [
+        positions[i], positions[i+1], positions[i+2],
+        positions[i+3], positions[i+4], positions[i+5]
+      ]
+      
+      // Проверяем, является ли ребро нижним
       const isBottom = 
         Math.abs(p1.y + pyramidParams.height/2) < 0.01 && 
         Math.abs(p2.y + pyramidParams.height/2) < 0.01;
       
       if (isBottom) {
-        bottomEdgesIndices.push(data.length);
+        // Определяем, переднее или заднее нижнее ребро
+        if (center.z > 0) {
+          frontBottom.push(...verts)
+        } else {
+          rearBottom.push(...verts)
+        }
+      } else {
+        other.push(...verts)
       }
+    }
+    
+    // Создаем геометрии
+    const frontBottomGeo = new THREE.BufferGeometry()
+    if (frontBottom.length > 0) {
+      frontBottomGeo.setAttribute('position', new THREE.Float32BufferAttribute(frontBottom, 3))
+    }
+    
+    const rearBottomGeo = new THREE.BufferGeometry()
+    if (rearBottom.length > 0) {
+      rearBottomGeo.setAttribute('position', new THREE.Float32BufferAttribute(rearBottom, 3))
+    }
+    
+    const otherGeo = new THREE.BufferGeometry()
+    if (other.length > 0) {
+      otherGeo.setAttribute('position', new THREE.Float32BufferAttribute(other, 3))
+    }
+    
+    return { 
+      frontBottomEdges: frontBottomGeo, 
+      rearBottomEdges: rearBottomGeo, 
+      otherEdges: otherGeo 
+    }
+  }, [])
+
+  // Состояния для остальных ребер (которые меняются)
+  const [visibleOtherEdges, setVisibleOtherEdges] = useState(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
+    return geo
+  })
+  
+  const [hiddenOtherEdges, setHiddenOtherEdges] = useState(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
+    return geo
+  })
+
+  // Данные для остальных ребер
+  const { otherEdgeData } = useMemo(() => {
+    if (!otherEdges.attributes?.position) return { otherEdgeData: [] }
+    
+    const positions = otherEdges.attributes.position.array
+    const data = []
+    
+    for (let i = 0; i < positions.length; i += 6) {
+      const p1 = new THREE.Vector3(positions[i], positions[i+1], positions[i+2])
+      const p2 = new THREE.Vector3(positions[i+3], positions[i+4], positions[i+5])
+      const center = p1.clone().add(p2).multiplyScalar(0.5)
       
       data.push({
-        p1, p2,
         center,
-        isBottom,
         vertices: [
           positions[i], positions[i+1], positions[i+2],
           positions[i+3], positions[i+4], positions[i+5]
@@ -68,21 +130,8 @@ const Figure = () => {
       })
     }
     
-    return { edgeData: data, bottomEdges: bottomEdgesIndices }
-  }, [])
-
-  // Состояния для геометрии
-  const [visibleEdges, setVisibleEdges] = useState(() => {
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
-    return geo
-  })
-  
-  const [hiddenEdges, setHiddenEdges] = useState(() => {
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
-    return geo
-  })
+    return { otherEdgeData: data }
+  }, [otherEdges])
 
   // Материалы
   const solidMaterial = useMemo(() => {
@@ -102,64 +151,27 @@ const Figure = () => {
     return material
   }, [])
 
-  // Функция для определения видимости ребра
-  const isEdgeVisible = (edge, cameraPos, groupMatrix, cameraHeight) => {
-    // Получаем центр ребра в мировых координатах
+  // Функция для определения видимости остальных ребер
+  const isOtherEdgeVisible = (edge, cameraPos, groupMatrix) => {
     const worldCenter = edge.center.clone().applyMatrix4(groupMatrix)
-    
-    // Направление от центра пирамиды к ребру
     const dirFromCenter = worldCenter.clone().normalize()
-    
-    // Направление от ребра к камере
     const dirToCamera = cameraPos.clone().sub(worldCenter).normalize()
-    
-    // Скалярное произведение
     const dot = dirFromCenter.dot(dirToCamera)
     
-    // Базовое условие видимости
-    const isBasicallyVisible = dot > -0.7
-    
-    // Если это нижнее ребро, применяем специальную логику
-    if (edge.isBottom) {
-      // Порог высоты камеры (относительно нижней точки пирамиды)
-      // Чем меньше значение, тем ниже должна быть камера
-      const LOW_CAMERA_THRESHOLD = -0.5; // Подберите это значение под вашу сцену
-      
-      // Получаем высоту камеры в локальных координатах пирамиды
-      const localCameraPos = cameraPos.clone().applyMatrix4(groupMatrix.clone().invert());
-      const cameraY = localCameraPos.y;
-      
-      // Камера считается "в самом низу", если она ниже определенного порога
-      const isCameraVeryLow = cameraY < LOW_CAMERA_THRESHOLD;
-      
-      // Если камера низко, то дальние нижние ребра становятся сплошными
-      if (isCameraVeryLow) {
-        // Для нижних ребер используем другую логику видимости
-        // Теперь они видны, если dot > -0.2 (более строгое условие)
-        // или если они находятся с противоположной стороны
-        return dot > -0.2;
-      }
-    }
-    
-    // Для всех остальных случаев используем стандартную логику
-    return isBasicallyVisible
+    return dot > -0.7
   }
 
-  // Обновляем видимость ребер
-  const updateEdges = (cameraPos) => {
-    if (!groupRef.current || !edgeData) return
+  // Обновляем только остальные ребра
+  const updateOtherEdges = (cameraPos) => {
+    if (!groupRef.current || !otherEdgeData.length) return
 
     const groupMatrix = groupRef.current.matrixWorld
-    
-    // Получаем высоту камеры в локальных координатах
-    const localCameraPos = cameraPos.clone().applyMatrix4(groupMatrix.clone().invert());
-    const cameraY = localCameraPos.y;
     
     const visibleVerts = []
     const hiddenVerts = []
     
-    edgeData.forEach(edge => {
-      const visible = isEdgeVisible(edge, cameraPos, groupMatrix, cameraY)
+    otherEdgeData.forEach(edge => {
+      const visible = isOtherEdgeVisible(edge, cameraPos, groupMatrix)
       
       if (visible) {
         visibleVerts.push(...edge.vertices)
@@ -168,42 +180,34 @@ const Figure = () => {
       }
     })
     
-    // Обновляем геометрии
     const newVisibleGeo = new THREE.BufferGeometry()
     if (visibleVerts.length > 0) {
       newVisibleGeo.setAttribute('position', new THREE.Float32BufferAttribute(visibleVerts, 3))
-    } else {
-      newVisibleGeo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
     }
     
     const newHiddenGeo = new THREE.BufferGeometry()
     if (hiddenVerts.length > 0) {
       newHiddenGeo.setAttribute('position', new THREE.Float32BufferAttribute(hiddenVerts, 3))
-    } else {
-      newHiddenGeo.setAttribute('position', new THREE.Float32BufferAttribute([], 3))
     }
     
-    setVisibleEdges(newVisibleGeo)
-    setHiddenEdges(newHiddenGeo)
+    setVisibleOtherEdges(newVisibleGeo)
+    setHiddenOtherEdges(newHiddenGeo)
   }
 
-  // Обновляем при каждом кадре
   useFrame(({ camera }) => {
     if (groupRef.current) {
-      updateEdges(camera.position)
+      updateOtherEdges(camera.position)
     }
   })
 
   return (
     <group ref={groupRef} position={[1.5, -0.8, 0]}>
-      {/* Освещение */}
       <ambientLight intensity={0.8} />
       <directionalLight position={[3, 5, 4]} intensity={1.5} />
       <directionalLight position={[-3, 2, 4]} intensity={1.0} />
       
-      {/* Основная пирамида */}
       <group ref={meshRef} position={[0, -0.3, 0]}>
-        {/* Прозрачный корпус - синий */}
+        {/* Прозрачный корпус */}
         <mesh castShadow receiveShadow>
           <coneGeometry 
             args={[
@@ -222,32 +226,50 @@ const Figure = () => {
           />
         </mesh>
         
-        {/* ВИДИМЫЕ РЕБРА - сплошные черные */}
-        {visibleEdges.attributes.position.count > 0 && (
+        {/* ПЕРЕДНИЕ НИЖНИЕ РЕБРА - сплошные */}
+        {frontBottomEdges.attributes?.position?.count > 0 && (
           <lineSegments
-            geometry={visibleEdges}
+            geometry={frontBottomEdges}
             material={solidMaterial}
             renderOrder={2}
           />
         )}
         
-        {/* НЕВИДИМЫЕ РЕБРА - пунктирные серые */}
-        {hiddenEdges.attributes.position.count > 0 && (
+        {/* ЗАДНИЕ НИЖНИЕ РЕБРА - ВСЕГДА ПУНКТИРНЫЕ */}
+        {rearBottomEdges.attributes?.position?.count > 0 && (
           <lineSegments
-            geometry={hiddenEdges}
+            geometry={rearBottomEdges}
             material={dashMaterial}
             renderOrder={1}
             onUpdate={self => self.computeLineDistances()}
           />
         )}
         
-        {/* Вершина - красная */}
+        {/* ОСТАЛЬНЫЕ РЕБРА - меняются по видимости */}
+        {visibleOtherEdges.attributes?.position?.count > 0 && (
+          <lineSegments
+            geometry={visibleOtherEdges}
+            material={solidMaterial}
+            renderOrder={2}
+          />
+        )}
+        
+        {hiddenOtherEdges.attributes?.position?.count > 0 && (
+          <lineSegments
+            geometry={hiddenOtherEdges}
+            material={dashMaterial}
+            renderOrder={1}
+            onUpdate={self => self.computeLineDistances()}
+          />
+        )}
+        
+        {/* Вершина */}
         <mesh position={[0, pyramidParams.height/2, 0]}>
           <sphereGeometry args={[0.06, 16, 16]} />
           <meshStandardMaterial color={pyramidParams.vertexTopColor} emissive="#330000" />
         </mesh>
         
-        {/* Нижние вершины - зеленые */}
+        {/* Нижние вершины */}
         {(() => {
           const points = []
           const angleStep = (Math.PI * 2) / pyramidParams.radialSegments
