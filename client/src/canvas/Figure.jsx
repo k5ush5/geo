@@ -233,16 +233,6 @@ const Figure = () => {
             </mesh>
           ))
         })()}
-
-        {/* Круглая тень под пирамидой */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -pyramidParams.height/2 - 0.15, 0]}>
-          <circleGeometry args={[pyramidParams.radius + 0.3, 32]} />
-          <meshBasicMaterial 
-            color="#000000" 
-            transparent={true} 
-            opacity={0.15} 
-          />
-        </mesh>
       </group>
     </group>
   )
