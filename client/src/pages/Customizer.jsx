@@ -8,8 +8,32 @@ import {downloadCanvasToImage, reader} from '../config/helpers';
 import {EditorTabs, FilterTabs, DecalTypes} from '../config/constants';
 import { fadeAnimation, slideAnimation } from '../config/motion';
 import { AIpicker, Colorpicker, CustomButton, Filepicker, Tab } from '../components';
+
 const Customizer = () => {
   const snap = useSnapshot(state);
+  const [file, setFile] = useState('')
+  const [prompt, setPrompt] = useState('')
+  const [generatingImg, setGeneratingImg] = useState(false)
+  const [activeEditorTab, setActiveEditorTab] = useState("")
+  const [activeFilterTab, setActiveFilterTab] = useState({
+    logoShirt : true,
+    stylishShirt : false,
+  })
+
+  const generateTabContent = () => {
+    switch(activeEditorTab) {
+      case "colorpicker" :
+        return <Colorpicker />
+      case "filepicker" :
+        // Вот ЗДЕСЬ добавляем onClose
+        return <Filepicker onClose={() => setActiveEditorTab('')} />
+      case "aipicker" :
+        return <AIpicker />
+      default:
+        return null
+    }
+  }
+
   return (
     <AnimatePresence>
       {!snap.intro && (
@@ -25,9 +49,10 @@ const Customizer = () => {
                   <Tab 
                     key={tab.name}
                     tab={tab}
-                    handleClick={() => {}}
+                    handleClick={() => setActiveEditorTab(tab.name)}
                   />
                 ))}
+                {generateTabContent()}
               </div>
             </div>
           </motion.div>
