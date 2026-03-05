@@ -23,9 +23,8 @@ const Customizer = () => {
   const generateTabContent = () => {
     switch(activeEditorTab) {
       case "colorpicker" :
-        return <Colorpicker />
+        return <Colorpicker onClose={() => setActiveEditorTab('')} />
       case "filepicker" :
-        // Вот ЗДЕСЬ добавляем onClose
         return <Filepicker onClose={() => setActiveEditorTab('')} />
       case "aipicker" :
         return <AIpicker />
