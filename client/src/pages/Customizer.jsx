@@ -27,7 +27,7 @@ const Customizer = () => {
       case "filepicker" :
         return <Filepicker onClose={() => setActiveEditorTab('')} />
       case "aipicker" :
-        return <AIpicker />
+        return <AIpicker onClose={() => setActiveEditorTab('')}/>
       default:
         return null
     }
