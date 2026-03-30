@@ -1,19 +1,23 @@
 import {Canvas} from '@react-three/fiber'
-import {Environment, Center} from '@react-three/drei'
 import Figure from './Figure'
-import  Backdrop from './Backdrop'
-import CameraRig from './CameraRig'
+import { useSnapshot } from 'valtio'
+import state from '../store'
+import { Environment, Center, OrbitControls } from '@react-three/drei'
 const CanvasModel = () => {
+  const snap = useSnapshot(state)
   return (
     <Canvas>
       <ambientLight intensity={0.5} />
       <Environment preset='city'/>
-      {/* <CameraRig> */}
-        {/* <Backdrop />  */}
         <Center>
           <Figure />
         </Center>
-     {/* </CameraRig> */}
+        <OrbitControls
+          enabled={!snap.aipickerMode}
+          enablePan={false}
+          enableZoom={false}
+          rotateSpeed={0.8}
+        />
     </Canvas>
   )
 }

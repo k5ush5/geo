@@ -3,6 +3,7 @@ import { useSnapshot } from 'valtio'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import state from '../store'
+import { OrbitControls } from '@react-three/drei';
 
 // Функция для нахождения пересечения плоскости с ребром
 const getEdgePlaneIntersection = (p1, p2, planeNormal, planePoint) => {
@@ -171,6 +172,7 @@ const Figure = () => {
   const snap = useSnapshot(state)
   const groupRef = useRef()
   const meshRef = useRef()
+  const facesRefs = useRef([]);
   
   useEffect(() => {
   // если режим активен — оставляем его
@@ -394,29 +396,79 @@ const Figure = () => {
     }
     return edges
   }, [basePoints, apexPoint])
+  const isEdgeHiddenPhysical = (edge, camera, facesMeshes) => {
+  const direction = camera.position.clone().sub(edge.center).normalize();
 
+  // 🔥 чуть выносим точку, чтобы не попасть в саму грань
+  const origin = edge.center.clone().add(direction.clone().multiplyScalar(0.01));
+
+  const raycaster = new THREE.Raycaster(origin, direction);
+  const intersects = raycaster.intersectObjects(facesMeshes, false);
+
+  if (intersects.length === 0) return false;
+
+  const distToCamera = origin.distanceTo(camera.position);
+
+  for (let hit of intersects) {
+    // ❗ игнорим саму точку (очень важно)
+    if (hit.distance < 0.02) continue;
+
+    // ❗ если пересечение ближе камеры → реально перекрыто
+    if (hit.distance < distToCamera - 0.01) {
+      return true;
+    }
+  }
+
+  return false;
+};
   const allEdges = [...bottomEdges, ...sideEdges]
   const [visibleEdges, setVisibleEdges] = useState({})
+  const isEdgeHidden = (edge, camera, facesMeshes) => {
+  const direction = camera.position.clone().sub(edge.center).normalize();
+  const origin = edge.center.clone().add(direction.clone().multiplyScalar(0.01));
 
+  const raycaster = new THREE.Raycaster(origin, direction);
+  const intersects = raycaster.intersectObjects(facesMeshes, false);
+
+  if (intersects.length === 0) return false;
+
+  const distToCamera = origin.distanceTo(camera.position);
+
+  for (let hit of intersects) {
+    if (hit.distance < 0.02) continue;
+
+    // 🔥 ключевой фикс
+    const hitPoint = hit.point;
+    const edgeToHit = hitPoint.clone().sub(edge.center);
+    const edgeToCam = camera.position.clone().sub(edge.center);
+
+    // ❗ проверяем, что грань РЕАЛЬНО между ребром и камерой
+    if (edgeToHit.length() > edgeToCam.length()) continue;
+
+    if (hit.distance < distToCamera - 0.01) {
+      return true;
+    }
+  }
+
+  return false;
+};
   useFrame(({ camera }) => {
-  if (!groupRef.current) return;
-
-  const matrix = groupRef.current.matrixWorld;
   const newVisibleEdges = {};
-
-  const center = new THREE.Vector3(0, 0, 0).applyMatrix4(matrix);
+  const facesMeshes = facesRefs.current.filter(Boolean);
 
   allEdges.forEach(edge => {
-    const worldCenter = edge.center.clone().applyMatrix4(matrix);
+  let hidden;
 
-    const toCamera = camera.position.clone().sub(worldCenter).normalize();
-    const toCenter = center.clone().sub(worldCenter).normalize();
+  if (edge.type === 'bottom') {
+    // 🔥 твоя старая идеальная логика
+    hidden = isEdgeHidden(edge, camera, facesMeshes);
+  } else {
+    // 🔥 новая физическая логика
+    hidden = isEdgeHiddenPhysical(edge, camera, facesMeshes);
+  }
 
-    // 🔥 ключевая идея
-    const isVisible = toCamera.dot(toCenter) < 0;
-
-    newVisibleEdges[`${edge.type}-${edge.index}`] = isVisible;
-  });
+  newVisibleEdges[`${edge.type}-${edge.index}`] = !hidden;
+});
 
   setVisibleEdges(newVisibleEdges);
 });
@@ -515,7 +567,6 @@ const getPointPos = (p) => {
   point: p.clone(),
   isUserPoint: false
 }));
-
   pts.forEach(up => {
     let best = -1;
     let min = Infinity;
@@ -544,7 +595,7 @@ const getPointPos = (p) => {
       
       <group ref={meshRef} position={[0, -0.3, 0]}>
         {faces.map((geometry, i) => (
-          <mesh key={`face-${i}`} geometry={geometry}>
+          <mesh key={`face-${i}`} geometry={geometry} ref={el => facesRefs.current[i] = el} userData={{ edgeIndex: i }}>
             <meshBasicMaterial 
               color={snap.color} 
               transparent 
@@ -563,32 +614,19 @@ const getPointPos = (p) => {
           
           if (isSelected) {
             material = new THREE.LineBasicMaterial({ color: '#ffaa00', linewidth: 3 })
-          } 
-          else if (edge.type === 'side') {
-            if (edge.index === 3) {
-              material = new THREE.LineDashedMaterial({ 
-                color: '#888888', 
-                dashSize: 0.08, 
-                gapSize: 0.06, 
-                linewidth: 1.5 
-              })
-            } else {
-              material = new THREE.LineBasicMaterial({ color: '#000000', linewidth: 2 })
-            }
-          }
-          else {
+          } else {
             if (isVisible) {
               material = new THREE.LineBasicMaterial({ color: '#000000', linewidth: 2 })
             } else {
-              material = new THREE.LineDashedMaterial({ 
-                color: '#888888', 
-                dashSize: 0.08, 
-                gapSize: 0.06, 
-                linewidth: 1.5 
+              material = new THREE.LineDashedMaterial({
+                color: '#888888',
+                dashSize: 0.08,
+                gapSize: 0.06,
+                linewidth: 1.5
               })
             }
           }
-          
+          // facesRefs.current = [];
           return (
   <group key={`${edge.type}-${edge.index}`}>
 
