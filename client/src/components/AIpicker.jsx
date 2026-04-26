@@ -89,7 +89,23 @@ const handleConfirm = () => {
   };
 
   return (
-    <div className="absolute left-full ml-3 w-80 bg-gray-900 rounded-lg shadow-xl border border-gray-700">
+   <div
+    style={{
+      position: window.innerWidth < 768 ? 'fixed' : 'absolute',
+      bottom: window.innerWidth < 768 ? 0 : 'auto',
+      left: window.innerWidth < 768 ? 0 : '100%',
+      width: window.innerWidth < 768 ? '100%' : '320px',
+      zIndex: 30
+    }}
+  >
+    <div
+      className="bg-gray-900 border border-gray-700 rounded-t-xl"
+      style={{
+        maxHeight: window.innerWidth < 768 ? '45vh' : 'auto',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }}
+    >
       <div className="p-4 border-b border-gray-700 flex justify-between items-center">
         <h3 className="text-white font-bold text-lg">Построение сечения</h3>
         <button onClick={handleClose} className="text-gray-400 hover:text-white text-xl font-bold">×</button>
@@ -165,6 +181,7 @@ const handleConfirm = () => {
           )}
         </div>
       </div>
+    </div>
     </div>
   );
 };

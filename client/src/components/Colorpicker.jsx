@@ -14,25 +14,42 @@ const Colorpicker = ({ onClose }) => {
   };
 
   return (
-    <div className="absolute left-full ml-3">
-      <div className="relative">
-        {/* Крестик для закрытия */}
-        <button 
-          onClick={handleClose}
-          className="absolute -top-2 -right-2 w-6 h-6 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg z-10 transition-colors"
-          aria-label="Закрыть"
-        >
-          ×
-        </button>
-        
-        <SketchPicker 
-          color={snap.color}
-          disableAlpha
-          onChange={(color) => state.color = color.hex}
-        />
-      </div>
+  <div
+    style={{
+      position: window.innerWidth < 768 ? 'fixed' : 'absolute',
+      bottom: window.innerWidth < 768 ? 0 : 'auto',
+      left: window.innerWidth < 768 ? 0 : '100%',
+      width: window.innerWidth < 768 ? '100%' : '320px',
+      zIndex: 30
+    }}
+  >
+    <div
+      className="border border-gray-700 rounded-t-xl"
+      style={{
+        maxHeight: window.innerWidth < 768 ? '45vh' : 'auto',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch'
+      }}
+    >
+    <div className="relative flex justify-center items-center h-full">
+      
+      <button 
+        onClick={handleClose}
+        className="absolute top-2 right-2 w-6 h-6 bg-gray-800 hover:bg-gray-700 rounded-full flex items-center justify-center text-white text-sm font-bold z-10"
+      >
+        ×
+      </button>
+      
+      <SketchPicker 
+        color={snap.color}
+        disableAlpha
+        onChange={(color) => state.color = color.hex}
+      />
+      
     </div>
-  )
+  </div>
+  </div>
+)
 }
 
 export default Colorpicker

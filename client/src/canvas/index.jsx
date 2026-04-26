@@ -6,16 +6,16 @@ import { Environment, Center, OrbitControls } from '@react-three/drei'
 const CanvasModel = () => {
   const snap = useSnapshot(state)
   return (
-    <Canvas>
+    <Canvas  style={{ width: '100%', height: '100%' }}>
       <ambientLight intensity={0.5} />
       <Environment preset='city'/>
         <Center>
           <Figure />
         </Center>
         <OrbitControls
-          enabled={!snap.aipickerMode}
           enablePan={false}
-          enableZoom={false}
+          enableZoom={true}
+          zoomSpeed={0.6}
           rotateSpeed={0.8}
         />
     </Canvas>

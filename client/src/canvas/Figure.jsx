@@ -589,7 +589,7 @@ const getPointPos = (p) => {
 }, [snap.sectionPlaneData, allEdges, basePoints, apexPoint]);
 
   return (
-    <group ref={groupRef} position={[1.5, -0.8, 0]}>
+    <group  ref={groupRef} position={[1.5, -0.3, 0]}>
       <ambientLight intensity={0.7} />
       <directionalLight position={[2, 3, 2]} intensity={0.8} />
       

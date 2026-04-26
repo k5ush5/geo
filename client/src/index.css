@@ -4,9 +4,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-html {
-  font-family: "Inter", sans-serif;
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
 @supports (font-variation-settings: normal) {
@@ -14,14 +16,19 @@ html {
     font-family: "Inter var", sans-serif;
   }
 }
-
 .app {
   position: relative;
   width: 100%;
   height: 100vh;
   overflow: hidden;
+    min-height: 100vh;
+  overflow-x: hidden;
 }
-
+@media (max-width: 768px) {
+  .app {
+    padding-bottom: 45vh;
+  }
+}
 /* Адаптация для iPhone 13 (390×844) */
 @media screen and (max-width: 390px) {
   .home {
@@ -184,18 +191,35 @@ html {
 
 .filtertabs-container {
   position: absolute;
-  z-index: 10;
   bottom: 1.25rem;
-  right: 0;
   left: 0;
-  width: 100%;
+  right: 0;
   display: flex;
   justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
   gap: 1rem;
+  z-index: 5;
 }
 
+/* 📱 телефон */
+@media (max-width: 768px) {
+  .filtertabs-container {
+    top: 12px;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    justify-content: center;
+    z-index: 10;
+  }
+}
+
+/* чтобы не блокировали */
+.filtertabs-container {
+  pointer-events: none;
+}
+
+.filtertabs-container * {
+  pointer-events: auto;
+}
 .aipicker-container {
   position: absolute;
   left: 100%;

@@ -51,20 +51,20 @@ const Customizer = () => {
                     handleClick={() => setActiveEditorTab(tab.name)}
                   />
                 ))}
-                {generateTabContent()}
+                
               </div>
+              {generateTabContent()}
             </div>
           </motion.div>
-
           <motion.div 
-            className="absolute z-10 top-5 right-5"
+            className="absolute z-30 top-4 right-4 md:right-5"
             {...fadeAnimation}
           >
             <CustomButton 
               type="filled"
               title="Go Back"
               handleClick={() => state.intro = true}
-              customStyles="w-fit px-4 py-2.5 font-bold text-sm"
+              customStyles="w-fit px-3 py-2 text-xs md:text-sm"
             />
           </motion.div>
           <motion.div
