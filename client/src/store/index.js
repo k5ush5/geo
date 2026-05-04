@@ -17,8 +17,7 @@ const state = proxy({
     },
     
     manuallyChanged: new Set(),
-    
-    // Для сечения
+    figureType: 'pyramid',
     aipickerMode: false,
     tempPoints: [],
     sectionPlaneData: null

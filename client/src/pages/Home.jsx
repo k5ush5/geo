@@ -23,22 +23,22 @@ const Home = () => {
                 </motion.header>
                 <motion.div className='home-content' {...headContainerAnimation}>
                     <motion.div {...headTextAnimation}>
-                        <h1 className='head-text'>
-                            LET'S <br className='xl:block hidden'/> DO IT.
-                        </h1>
+                        {/* <h1 className='head-text'>
+                            НАЧ <br className='xl:block hidden'/> НИ.
+                        </h1> */}
                     </motion.div>
                     <motion.div
                         {...headContentAnimation}
                         className='flex flex-col gap-5'
                     >
                         <p className='max-w-md font-normal text-gray-600 text-base'>
-                            Understand 10th class geometry by our <strong>3D models</strong>{" "} of one of the most common geometry tasks.
+                            Пойми стереометрию с помощью <strong>визуализации</strong>{" "}.
                         </p>
                         <CustomButton 
                             type="filled"
-                            title="Try it"
+                            title="Попробовать"
                             handleClick={() => state.intro = false}
-                            customStyles="w-fit px-4 py-2.5 font-bold text-sm"
+                            customStyles="w-fit px-4 py-2.5 font-bold text-sm md:mx-0 mx-auto"
                         />
                     </motion.div>
                 </motion.div>

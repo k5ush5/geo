@@ -32,7 +32,14 @@ const Customizer = () => {
         return null
     }
   }
-
+  const handleFilterClick = (tab) => {
+    if (tab.name === 'pyramid') {
+      state.figureType = 'pyramid'
+    }
+    if (tab.name === 'cube') {
+      state.figureType = 'cube'
+    }
+  }
   return (
     <AnimatePresence>
       {!snap.intro && (
@@ -62,7 +69,7 @@ const Customizer = () => {
           >
             <CustomButton 
               type="filled"
-              title="Go Back"
+              title="Назад"
               handleClick={() => state.intro = true}
               customStyles="w-fit px-3 py-2 text-xs md:text-sm"
             />
@@ -76,8 +83,7 @@ const Customizer = () => {
                 key={tab.name}
                 tab={tab}
                 isFilterTab
-                ifActiveTab=""
-                handleClick={() => {}}
+                handleClick={() => handleFilterClick(tab)}
               />
             ))}
           </motion.div>
