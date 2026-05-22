@@ -8,7 +8,7 @@ const CanvasModel = () => {
   return (
     <Canvas  style={{ width: '100%', height: '100%' }}>
       <ambientLight intensity={0.5} />
-      <Environment preset='city'/>
+      {/* <Environment preset='city'/> */}
         <Center>
           <Figure />
         </Center>
