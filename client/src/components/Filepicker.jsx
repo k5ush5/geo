@@ -17,9 +17,8 @@ const Filepicker = ({ onClose }) => {
     state.selectedEdge = null;
     const timer = setTimeout(() => {
       state.selectedEdge = {
-        type: selectedType,
-        index: selectedIndex
-      };
+  type: selectedType
+};
     }, 10);
     return () => {
       clearTimeout(timer);
@@ -139,7 +138,11 @@ const Filepicker = ({ onClose }) => {
 
       iterations++;
     }
-    state.edgeSizes = { bottom: newBottom, side: newSide };
+    state.edgeSizes = {
+  ...snap.edgeSizes,
+  bottom: newBottom,
+  side: newSide
+};
     state.manuallyChanged = manuallyChanged;
     state.tempPoints = [];
   };
