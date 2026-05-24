@@ -83,7 +83,15 @@ const Customizer = () => {
                 key={tab.name}
                 tab={tab}
                 isFilterTab
-                handleClick={() => handleFilterClick(tab)}
+                handleClick={() => {
+                if (tab.name === 'logoShirt') {
+                  state.currentFigure = 'cube'
+                }
+
+                if (tab.name === 'stylishShirt') {
+                  state.currentFigure = 'pyramid'
+                }
+              }}
               />
             ))}
           </motion.div>

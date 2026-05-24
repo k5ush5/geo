@@ -12,15 +12,21 @@ const state = proxy({
     selectedEdge: null,
     
     edgeSizes: {
-        bottom: [5, 5, 5, 5],
-        side: [5, 5, 5, 5]
+        bottom: [5,5,5,5],
+        side: [5,5,5,5],
+
+        cube: {
+            width: 5,
+            depth: 5,
+            height: 5
+        }
     },
     
     manuallyChanged: new Set(),
-    figureType: 'pyramid',
+    currentFigure: 'pyramid',
     aipickerMode: false,
     tempPoints: [],
-    sectionPlaneData: null
+    sectionPlaneData: null,
 });
 
 export default state;

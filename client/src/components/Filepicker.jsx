@@ -5,7 +5,11 @@ import state from '../store';
 const Filepicker = ({ onClose }) => {
   const snap = useSnapshot(state);
   
-  const [selectedType, setSelectedType] = useState('bottom');
+  const [selectedType, setSelectedType] = useState(
+    snap.currentFigure === 'cube'
+      ? 'width'
+      : 'bottom'
+  )
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [inputValue, setInputValue] = useState('5');
 
@@ -36,6 +40,23 @@ const Filepicker = ({ onClose }) => {
   };
 
   const applySize = () => {
+    if (snap.currentFigure === 'cube') {
+  state.edgeSizes.cube = {
+    ...snap.edgeSizes.cube,
+    [selectedType]: parseFloat(inputValue)
+  };
+
+  return;
+}
+    // if (snap.currentFigure === 'cube') {
+    //   const newSize = parseFloat(inputValue)
+    //   if (isNaN(newSize) || newSize <= 0) return
+    //   state.edgeSizes.cube = {
+    //     ...snap.edgeSizes.cube,
+    //     [selectedType]: newSize
+    //   }
+    //   return
+    // }
     const newSize = parseFloat(inputValue);
     if (isNaN(newSize) || newSize <= 0 || newSize > 20) return;
 
@@ -128,7 +149,14 @@ const Filepicker = ({ onClose }) => {
     onClose();
   };
 
-  const currentSize = snap.edgeSizes[selectedType][selectedIndex];
+  let currentSize = 5;
+
+  if (snap.currentFigure === 'cube') {
+    currentSize = snap.edgeSizes?.cube?.[selectedType] || 5;
+  } else {
+    currentSize =
+      snap.edgeSizes?.[selectedType]?.[selectedIndex] || 5;
+  }
 
   return (
     <div
@@ -160,28 +188,68 @@ const Filepicker = ({ onClose }) => {
 
       <div className="p-4 space-y-4">
         <div className="flex gap-2">
-          <button
-            onClick={() => setSelectedType('bottom')}
-            className={`flex-1 px-2 py-1 rounded text-sm ${
-              selectedType === 'bottom' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-800 text-gray-300'
-            }`}
-          >
-            Нижние
-          </button>
-          <button
-            onClick={() => setSelectedType('side')}
-            className={`flex-1 px-2 py-1 rounded text-sm ${
-              selectedType === 'side' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-800 text-gray-300'
-            }`}
-          >
-            Боковые
-          </button>
-        </div>
+          {snap.currentFigure === 'cube' ? (
+  <>
+    <button
+      onClick={() => setSelectedType('width')}
+      className={`flex-1 px-2 py-1 rounded text-sm ${
+        selectedType === 'width'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-800 text-gray-300'
+      }`}
+    >
+      Ширина
+    </button>
 
+    <button
+      onClick={() => setSelectedType('depth')}
+      className={`flex-1 px-2 py-1 rounded text-sm ${
+        selectedType === 'depth'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-800 text-gray-300'
+      }`}
+    >
+      Длина
+    </button>
+
+    <button
+      onClick={() => setSelectedType('height')}
+      className={`flex-1 px-2 py-1 rounded text-sm ${
+        selectedType === 'height'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-800 text-gray-300'
+      }`}
+    >
+      Высота
+    </button>
+  </>
+) : (
+  <>
+    <button
+      onClick={() => setSelectedType('bottom')}
+      className={`flex-1 px-2 py-1 rounded text-sm ${
+        selectedType === 'bottom'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-800 text-gray-300'
+      }`}
+    >
+      Нижние
+    </button>
+
+    <button
+      onClick={() => setSelectedType('side')}
+      className={`flex-1 px-2 py-1 rounded text-sm ${
+        selectedType === 'side'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-800 text-gray-300'
+      }`}
+    >
+      Боковые
+    </button>
+  </>
+)}
+        </div>
+        {snap.currentFigure !== 'cube' && (
         <div>
           <p className="text-gray-400 text-xs mb-2">Номер:</p>
           <div className="flex gap-2">
@@ -200,12 +268,12 @@ const Filepicker = ({ onClose }) => {
             ))}
           </div>
         </div>
-
+        )}
         <div className="bg-gray-800 p-2 rounded text-center">
           <p className="text-gray-400 text-xs">Текущий</p>
           <p className="text-xl font-bold text-blue-400">
-            {currentSize.toFixed(1)} см
-          </p>
+          {currentSize ? currentSize.toFixed(1) : "5.0"} см
+        </p>
         </div>
 
         <input 

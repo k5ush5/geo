@@ -41,7 +41,11 @@ const createEdgeHitbox = (start, end) => {
   return mesh;
 };
 // Функция для построения многоугольника сечения
-const computeSectionPolygon = (basePoints, apexPoint, p1, p2, p3) => {
+const computeSectionPolygon = (  vertices,
+  edges,
+  p1,
+  p2,
+  p3) => {
   // Создаем плоскость по трем точкам
   const epsilon = 1e-6;
   const v1 = new THREE.Vector3().subVectors(p2, p1);
@@ -50,14 +54,7 @@ const computeSectionPolygon = (basePoints, apexPoint, p1, p2, p3) => {
   const planePoint = p1;
 
   const intersections = [];
-  const edges = [];
-  // Все ребра пирамиды
-  for (let i = 0; i < 4; i++) {
-    const next = (i + 1) % 4;
-    edges.push([basePoints[i], basePoints[next]]);
-    edges.push([basePoints[i], apexPoint]);
-  }
-  
+
   // Находим пересечения плоскости с ребрами
   edges.forEach(([start, end]) => {
     const d1 = normal.dot(start.clone().sub(planePoint));
@@ -180,29 +177,69 @@ const Figure = () => {
     state.aipickerMode = true;
   }
 }, [snap.edgeSizes]);
-  
   const baseRadius = 1.2
   const baseHeight = 2.2
   const segments = 4
-
+  const isCube = snap.currentFigure === 'cube'
   const bottomSizes = snap.edgeSizes?.bottom || [5, 5, 5, 5]
   const sideSizes = snap.edgeSizes?.side || [5, 5, 5, 5]
+  const cubeSizes = snap.edgeSizes?.cube || {
+    width: 5,
+    depth: 5,
+    height: 5
+  }
 
   const basePoints = useMemo(() => {
-    const points = []
-    for (let i = 0; i < segments; i++) {
-      const angle = (i / segments) * Math.PI * 2
-      const radius = baseRadius * (bottomSizes[i] / 5)
-      points.push(new THREE.Vector3(
+
+  // 🔥 КУБ / ПАРАЛЛЕЛЕПИПЕД
+  if (isCube) {
+
+    const w = cubeSizes.width / 5
+    const d = cubeSizes.depth / 5
+
+    return [
+      new THREE.Vector3(-w, -1, -d),
+      new THREE.Vector3(w, -1, -d),
+      new THREE.Vector3(w, -1, d),
+      new THREE.Vector3(-w, -1, d),
+    ]
+  }
+
+  // 🔥 ПИРАМИДА
+  const points = []
+
+  for (let i = 0; i < segments; i++) {
+    const angle = (i / segments) * Math.PI * 2
+    const radius = baseRadius * (bottomSizes[i] / 5)
+
+    points.push(
+      new THREE.Vector3(
         Math.cos(angle) * radius,
-        -baseHeight/2,
+        -baseHeight / 2,
         Math.sin(angle) * radius
-      ))
-    }
-    return points
-  }, [bottomSizes])
+      )
+    )
+  }
+
+  return points
+
+}, [bottomSizes, isCube])
+const topPoints = useMemo(() => {
+
+  if (!isCube) return []
+
+  const h = cubeSizes.height / 5
+
+  return basePoints.map(
+    p => new THREE.Vector3(p.x, h, p.z)
+  )
+
+}, [basePoints, cubeSizes, isCube])
 
   const apexPoint = useMemo(() => {
+    if (isCube) {
+      return new THREE.Vector3(0, 1, 0)
+    }
     let point = new THREE.Vector3(0, baseHeight/2, 0)
     
     const iterations = 100
@@ -285,6 +322,60 @@ const Figure = () => {
   );
 };
   const faces = useMemo(() => {
+      if (isCube) {
+
+    const geometries = []
+
+    const topPoints = basePoints.map(
+      p => new THREE.Vector3(p.x, 1, p.z)
+    )
+
+    const allFaces = [
+
+      // низ
+      [basePoints[0], basePoints[1], basePoints[2]],
+      [basePoints[0], basePoints[2], basePoints[3]],
+
+      // верх
+      [topPoints[0], topPoints[1], topPoints[2]],
+      [topPoints[0], topPoints[2], topPoints[3]],
+
+      // боки
+      [basePoints[0], basePoints[1], topPoints[1]],
+      [basePoints[0], topPoints[1], topPoints[0]],
+
+      [basePoints[1], basePoints[2], topPoints[2]],
+      [basePoints[1], topPoints[2], topPoints[1]],
+
+      [basePoints[2], basePoints[3], topPoints[3]],
+      [basePoints[2], topPoints[3], topPoints[2]],
+
+      [basePoints[3], basePoints[0], topPoints[0]],
+      [basePoints[3], topPoints[0], topPoints[3]],
+    ]
+
+    allFaces.forEach(face => {
+
+      const geometry = new THREE.BufferGeometry()
+
+      const verts = new Float32Array([
+        ...face[0].toArray(),
+        ...face[1].toArray(),
+        ...face[2].toArray()
+      ])
+
+      geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(verts, 3)
+      )
+
+      geometry.computeVertexNormals()
+
+      geometries.push(geometry)
+    })
+
+    return geometries
+  }
     const geometries = []
     
     for (let i = 0; i < segments; i++) {
@@ -421,7 +512,111 @@ const Figure = () => {
 
   return false;
 };
-  const allEdges = [...bottomEdges, ...sideEdges]
+  const cubeEdges = useMemo(() => {
+
+  if (!isCube) return []
+
+  const edges = []
+
+  // нижние width
+  edges.push({
+    start: basePoints[0],
+    end: basePoints[1],
+    type: 'width'
+  })
+
+  edges.push({
+    start: basePoints[2],
+    end: basePoints[3],
+    type: 'width'
+  })
+
+  // верхние width
+  edges.push({
+    start: topPoints[0],
+    end: topPoints[1],
+    type: 'width'
+  })
+
+  edges.push({
+    start: topPoints[2],
+    end: topPoints[3],
+    type: 'width'
+  })
+
+  // depth
+  edges.push({
+    start: basePoints[1],
+    end: basePoints[2],
+    type: 'depth'
+  })
+
+  edges.push({
+    start: basePoints[3],
+    end: basePoints[0],
+    type: 'depth'
+  })
+
+  edges.push({
+    start: topPoints[1],
+    end: topPoints[2],
+    type: 'depth'
+  })
+
+  edges.push({
+    start: topPoints[3],
+    end: topPoints[0],
+    type: 'depth'
+  })
+
+  // height
+  for (let i = 0; i < 4; i++) {
+
+    edges.push({
+      start: basePoints[i],
+      end: topPoints[i],
+      type: 'height'
+    })
+  }
+
+  return edges.map((edge, index) => {
+
+    const start = toDisplayCoords(edge.start)
+    const end = toDisplayCoords(edge.end)
+
+    const geometry = new THREE.BufferGeometry()
+
+    geometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(
+        new Float32Array([
+          start.x, start.y, start.z,
+          end.x, end.y, end.z
+        ]),
+        3
+      )
+    )
+
+    return {
+      ...edge,
+      geometry,
+      index,
+      start,
+      end,
+
+      center: new THREE.Vector3()
+        .addVectors(start, end)
+        .multiplyScalar(0.5),
+
+      hitbox: createEdgeHitbox(start, end)
+    }
+  })
+
+}, [basePoints, topPoints, isCube, scale])
+
+  const allEdges = isCube
+  ? cubeEdges
+  : [...bottomEdges, ...sideEdges]
   const [visibleEdges, setVisibleEdges] = useState({})
   const isEdgeHidden = (edge, camera, facesMeshes) => {
   const direction = camera.position.clone().sub(edge.center).normalize();
@@ -495,20 +690,16 @@ const handleEdgeClick = (event, edge) => {
   };
 
   let localPoint = event.point.clone();
+
   meshRef.current.worldToLocal(localPoint);
+  const edgeVec = new THREE.Vector3()
+    .subVectors(edge.end, edge.start);
 
-  localPoint = snapToVertex(localPoint);
-
-  // 🔥 округление ПОСЛЕ создания
-  localPoint.x = Math.round(localPoint.x * 1000) / 1000;
-  localPoint.y = Math.round(localPoint.y * 1000) / 1000;
-  localPoint.z = Math.round(localPoint.z * 1000) / 1000;
-
-  const edgeVec = new THREE.Vector3().subVectors(edge.end, edge.start);
-const pointVec = new THREE.Vector3().subVectors(localPoint, edge.start);
-
-const t = pointVec.dot(edgeVec) / edgeVec.lengthSq();
+  const pointVec = new THREE.Vector3()
+    .subVectors(localPoint, edge.start);
+  const t = pointVec.dot(edgeVec) / edgeVec.lengthSq();
 const clampedT = Math.max(0, Math.min(1, t));
+
 
 const newPoint = {
   id: Date.now() + Math.random(),
@@ -532,8 +723,16 @@ const getPointPos = (p) => {
 };
   state.tempPoints = [...(snap.tempPoints || []), newPoint];
 };
+  const cubeVertices = useMemo(() => {
 
-  // СЕЧЕНИЕ - ИСПРАВЛЕНО!
+  if (!isCube) return []
+
+  return [
+    ...basePoints.map(toDisplayCoords),
+    ...topPoints.map(toDisplayCoords)
+  ]
+
+}, [basePoints, topPoints, isCube])
   const sectionPolygon = useMemo(() => {
   const data = snap.sectionPlaneData;
   if (!data || !data.points || data.points.length < 3) return null;
@@ -553,11 +752,20 @@ const getPointPos = (p) => {
   if (pts.some(p => !p)) return null; // ❗ ключ
 
   const polygon = computeSectionPolygon(
-  basePoints.map(toDisplayCoords),
-  toDisplayCoords(apexPoint),
-  pts[0],
-  pts[1],
-  pts[2]
+    isCube
+  ? cubeVertices
+  : basePoints.map(toDisplayCoords),
+
+isCube
+  ? cubeEdges.map(e => [e.start, e.end])
+  : [
+      ...bottomEdges.map(e => [e.start, e.end]),
+      ...sideEdges.map(e => [e.start, e.end])
+    ],
+
+pts[0],
+pts[1],
+pts[2]
 );
 
   if (!polygon || polygon.length < 3) return null;
@@ -655,20 +863,46 @@ const getPointPos = (p) => {
           
         })}
         
-        {basePoints.map((point, i) => (
-          <mesh 
-            key={`base-${i}`} 
+        {!isCube && (
+  <>
+    {basePoints.map((point, i) => (
+          <mesh
+            key={`base-${i}`}
             position={toDisplayCoords(point)}
           >
             <sphereGeometry args={[0.05, 16, 16]} />
-            <meshStandardMaterial color="#55ff55" emissive="#003300" />
+            <meshStandardMaterial
+              color="#55ff55"
+              emissive="#003300"
+            />
           </mesh>
         ))}
-        
+
         <mesh position={toDisplayCoords(apexPoint)}>
           <sphereGeometry args={[0.06, 16, 16]} />
-          <meshStandardMaterial color="#ff5555" emissive="#330000" />
+          <meshStandardMaterial
+            color="#ff5555"
+            emissive="#330000"
+          />
         </mesh>
+      </>
+    )}
+    {isCube && (
+  <>
+    {[...basePoints, ...topPoints].map((point, i) => (
+      <mesh
+        key={`cube-point-${i}`}
+        position={point}
+      >
+        <sphereGeometry args={[0.05, 16, 16]} />
+        <meshStandardMaterial
+          color="#55ff55"
+          emissive="#003300"
+        />
+      </mesh>
+    ))}
+  </>
+)}
 
         {snap.aipickerMode && snap.tempPoints?.map((point) => {
   const edge = allEdges.find(
